@@ -5,7 +5,7 @@
 
 ## 1.1 Router receive a BGP route
 
-![BGP receive route](https://github.com/goodluck68/Picture_Repo/blob/master/iShot_2023-10-23_19.16.26.png?raw=true)
+![BGP receive route](https://github.com/goodluck68/Picture_Repo/blob/master/iShot_2023-10-23_19.15.05.png?raw=true)
 
 
 1. **Apply Import Route Policy**
@@ -54,11 +54,11 @@
 
 1. **Weight check**
    
-   Prefer the path with the highest WEIGHT. This attribute does not send to BGP neighbor
+   Prefer the path with the highest `WEIGHT`. This attribute does not send to BGP neighbor
 
 2. **Local preference check**
    
-   Prefer the path with the highest LOCAL_PREF. Default value is 100.
+   Prefer the path with the highest `LOCAL_PREF`. Default value is 100.
 
 3. **Local route check**
    
@@ -66,7 +66,7 @@
 
 4. **AS path length check**
    
-   Prefer the path with the shortest AS_PATH.
+   Prefer the path with the shortest `AS_PATH`.
 
 5. **Origin check**
    
@@ -77,11 +77,11 @@
    
 6. **MED check**
    
-   Prefer the path with the lowest MED. Default value is 0.
+   Prefer the path with the lowest `MED`. Default value is 0.
 
 7. **External check**
    
-   Prefer eBGP over iBGP paths.
+   Prefer EBGP over IBGP paths.
 
 8. **IGP cost check**
    
@@ -105,19 +105,19 @@
 
 - **Between AS**: `AS_PATH`
 
-   When router sends BGP update to EBGP neighbor, the AS number is appended to the AS_PATH attribute of the route. If a router detects its own AS number in the AS_PATH, it recognizes the route as looping back and discards it.
+   When router sends BGP update to EBGP neighbor, the AS number is appended to the `AS_PATH` attribute of the route. If a router detects its own AS number in the `AS_PATH`, it recognizes the route as looping back and discards it.
 
 
 #### Route Reflectors
 
 - **Within Route Reflectors**: `ORIGINATOR_ID`
 
-   When a route reflector forwards an iBGP update, it includes an optional BGP attribute called `ORIGINATOR_ID`. This attribute contains the router ID of the router that originated this route update. If a route reflector receives a route with an `ORIGINATOR_ID` that matches its own ID, it will discard the update to avoid a loop.
+   When a route reflector forwards an IBGP update, it includes an optional BGP attribute called `ORIGINATOR_ID`. This attribute contains the router ID of the router that originated this route update. If a route reflector receives a route with an `ORIGINATOR_ID` that matches its own ID, it will discard the update to avoid a loop.
 
 
 - **Between Route Reflectors**: `CLUSTER_LIST`
 
-   CLUSTER_LIST is updated by the route reflector. This attribute is appended by the route reflector with its cluster-id. By default this is the BGP identifier. If a route reflector receives a NLRI with its cluster-id in the Cluster List attribute, the NLRI is discarded.
+   `CLUSTER_LIST` is updated by the route reflector. This attribute is appended by the route reflector with its cluster-id. By default this is the BGP identifier. If a route reflector receives a `NLRI` with its cluster-id in the Cluster List attribute, the `NLRI` is discarded.
 
 
 ### 1.4.2 Difference between network/redistribute/aggregate
@@ -158,7 +158,7 @@ If the `AS_SET` attribute is not used during aggregation, the `ATOMIC_AGGREGATE`
 
 ## 1.4.4 BGP Suppress FIB Pending Feature
 
-![BGP receive route](https://github.com/goodluck68/Picture_Repo/blob/master/iShot_2023-10-23_19.15.05.png?raw=true)
+![BGP receive route](https://github.com/goodluck68/Picture_Repo/blob/master/iShot_2023-10-23_19.16.26.png?raw=true)
 
 When router receives a BGP route from a peer, there are certain situations, such as when the hardware table is full, which can lead to routes not being installed in the FIB. However, the route can still be advertised to BGP neighbors. Subsequently, when neighboring routers send packets to router, the packets are dropped due to no route in the FIB, resulting in a routing blackhole.
 
@@ -174,7 +174,7 @@ The solution is to provide a configurable option to check for the FIB install st
 
 **Problem**: 
 
-In the current script, routes are sent by executing commands on ExaBGP. In a stress case where we need to send 1000 routes, it's inefficient to loop the command execution 1000 times. There's a need to find a method that allows for the swift sending of a large number of routes.
+In the current script, routes are sent by executing commands on ExaBGP. In a stress case where we need to send 1000 routes, it's inefficient to loop the command execution 1000 times. So we need to find a method to send a large number of routes in a short time.
 
 **Solution**: 
 
@@ -202,6 +202,7 @@ def generate_bgp_route_commands(action, ip_routes):
 In the existing script, the routes being used and the IP addresses during traffic test are defined within a constant. For stress testing, this approach is inefficient. This is the current implementation.
 
 ```python
+# ipv4 route injection from T0
 IP_ROUTE_LIST = [
     '91.0.1.0/24',
     '91.0.2.0/24'
@@ -233,7 +234,9 @@ TRAFFIC_DATA_DROP = [
 
 **Solution**: 
 
-Define new functions `generate_ip_routes` and `generate_traffic_data`. This function would take the starting route address and the number of routes as inputs, dynamically generating the routes. Both function test and stress test can use this method to generate routes, ensuring better scalability.
+Define new functions `generate_ip_routes` and `generate_traffic_data`. Both function test and stress test can use this method to generate routes, ensuring better scalability.
+
+1. `generate_ip_routes` function: It takes the starting route address and the number of routes as inputs, dynamically generating the routes. 
 
 ```python
 IP_ROUTE = '91.0.1.0/24'
@@ -283,8 +286,12 @@ def ip_increment(ip_str):
 
     # Convert the incremented address back to a string with the same netmask
     return f"{next_net_addr}/{net.prefixlen}"
+```
 
 
+1. `generate_traffic_data` function: It takes the the generated route in previous steps as input, then get the first available IP address from the subnet as the traffic destination IP (The original case also uses the first available address in the subnet as the destination IP)
+
+```python
 def generate_traffic_data(route_list, action):
     """
     Generate traffic data list
@@ -304,6 +311,22 @@ def generate_traffic_data(route_list, action):
         traffic_data_list.append(traffic_data)
 
     return traffic_data_list
+
+
+def get_first_ip(subnet):
+    """
+    Get the first usable IP from the subnet
+    """
+    # Use the subnet to generate an IP network object
+    network = ipaddress.ip_network(subnet, strict=False)
+
+    # hosts() method returns a generator that include all usable IPs in the subnet
+    all_usable_ips = network.hosts()
+
+    # Get the first usable IP from the generator
+    first_ip = next(all_usable_ips)
+
+    return str(first_ip)
 ```
 
 
@@ -317,8 +340,8 @@ Currently the `validate_route_states` and `validate_route_propagate` functions g
 **Solution**:
 
 Update the functions `validate_route_states` and `validate_route_propagate` to read routes from dynamically generated data, so that it is also applicable to a large number of routes
-- `validate_route_states`: Add a parameter `ip_routes` to pass route info
-- `validate_route_propagate`: Add parameters `ipv4_route_list` and `ipv6_route_list` to pass route info
+
+1. `validate_route_states` function: Add a parameter `ip_routes` to pass route info
 
 ```python
 def validate_route_states(duthost, ip_routes, vrf=DEFAULT, check_point=QUEUED, action=ACTION_IN):
@@ -329,8 +352,11 @@ def validate_route_states(duthost, ip_routes, vrf=DEFAULT, check_point=QUEUED, a
         # IPv4 address has a ".", IPv6 address has a ":", use this to determine the IP version
         ip_ver = IP_VER if "." in route else IPV6_VER
         check_route_install_status(duthost, route, vrf, ip_ver, check_point, action)
+```
 
+2. `validate_route_propagate` function: Add parameters `ipv4_route_list` and `ipv6_route_list` to pass route info
 
+```python
 def validate_route_propagate(duthost, tbinfo, vrf=DEFAULT, exist=True, ipv4_route_list=None, ipv6_route_list=None):
     """
     Verify ipv4 and ipv6 route propagate status
@@ -381,9 +407,6 @@ def test_bgp_route_with_suppress(duthost, tbinfo, nbrhosts, ptfadapter, localhos
             # TBD: other three cases also need to add this content
             ip_routes_ipv4 = generate_ip_routes(IP_ROUTE, count=ROUTE_COUNT)
             ip_routes_ipv6 = generate_ip_routes(IPV6_ROUTE, count=ROUTE_COUNT)
-            # [stress] This is for stress test
-            ip_routes_ipv4_stress = generate_ip_routes(IP_ROUTE, count=BULK_ROUTE_COUNT)
-            ip_routes_ipv6_stress = generate_ip_routes(IPV6_ROUTE, count=BULK_ROUTE_COUNT)
 
             # Generate traffic data dynamically, the format is same as current constant
             # TRAFFIC_DATA_DROP and TRAFFIC_DATA_FORWARD
@@ -394,11 +417,7 @@ def test_bgp_route_with_suppress(duthost, tbinfo, nbrhosts, ptfadapter, localhos
             traffic_data_ipv6_drop = generate_traffic_data(ip_routes_ipv6, DROP)
             traffic_data_ipv4_forward = generate_traffic_data(ip_routes_ipv4, FORWARD)
             traffic_data_ipv6_forward = generate_traffic_data(ip_routes_ipv6, FORWARD)
-            # [stress] This is for stress test
-            traffic_data_ipv4_drop_stress = generate_traffic_data(ip_routes_ipv4_stress, DROP)
-            traffic_data_ipv6_drop_stress = generate_traffic_data(ip_routes_ipv6_stress, DROP)
-            traffic_data_ipv4_forward_stress = generate_traffic_data(ip_routes_ipv4_stress, FORWARD)
-            traffic_data_ipv6_forward_stress = generate_traffic_data(ip_routes_ipv6_stress, FORWARD)
+
 ```
 
 
@@ -440,22 +459,14 @@ def generate_route_and_traffic_data():
     # For example:
     # Input: ['91.0.1.0/24', '91.0.2.0/24']
     # Output: [('91.0.1.1', 'FORWARD'), ('91.0.2.1', 'FORWARD')]
-    route_and_traffic_data["traffic_data_ipv4_drop"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv4"],
-                                                                             DROP)
-    route_and_traffic_data["traffic_data_ipv6_drop"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv6"],
-                                                                             DROP)
-    route_and_traffic_data["traffic_data_ipv4_forward"] = generate_traffic_data(
-        route_and_traffic_data["ip_routes_ipv4"], FORWARD)
-    route_and_traffic_data["traffic_data_ipv6_forward"] = generate_traffic_data(
-        route_and_traffic_data["ip_routes_ipv6"], FORWARD)
-    route_and_traffic_data["traffic_data_ipv4_drop_stress"] = generate_traffic_data(
-        route_and_traffic_data["ip_routes_ipv4_stress"], DROP)
-    route_and_traffic_data["traffic_data_ipv6_drop_stress"] = generate_traffic_data(
-        route_and_traffic_data["ip_routes_ipv6_stress"], DROP)
-    route_and_traffic_data["traffic_data_ipv4_forward_stress"] = generate_traffic_data(
-        route_and_traffic_data["ip_routes_ipv4_stress"], FORWARD)
-    route_and_traffic_data["traffic_data_ipv6_forward_stress"] = generate_traffic_data(
-        route_and_traffic_data["ip_routes_ipv6_stress"], FORWARD)
+    route_and_traffic_data["traffic_data_ipv4_drop"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv4"], DROP)
+    route_and_traffic_data["traffic_data_ipv6_drop"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv6"], DROP)
+    route_and_traffic_data["traffic_data_ipv4_forward"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv4"], FORWARD)
+    route_and_traffic_data["traffic_data_ipv6_forward"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv6"], FORWARD)
+    route_and_traffic_data["traffic_data_ipv4_drop_stress"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv4_stress"], DROP)
+    route_and_traffic_data["traffic_data_ipv6_drop_stress"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv6_stress"], DROP)
+    route_and_traffic_data["traffic_data_ipv4_forward_stress"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv4_stress"], FORWARD)
+    route_and_traffic_data["traffic_data_ipv6_forward_stress"] = generate_traffic_data(route_and_traffic_data["ip_routes_ipv6_stress"], FORWARD)
 
     return route_and_traffic_data
 ```
@@ -465,7 +476,7 @@ def generate_route_and_traffic_data():
 
 **Problem**:
 
-Many test steps in the functional script test_bgp_route_with_suppress are the same as those in the stress test script. These two scripts can be merged.
+Many test steps in the functional script `test_bgp_route_with_suppress` are the same as those in the stress test script. These two scripts can be merged.
 
 **Solution**:
 
@@ -526,7 +537,28 @@ def test_bgp_route_with_suppress(duthost, tbinfo, nbrhosts, ptfadapter, localhos
 
 
 # 3. Future Plans
-1. Learn how to generate a test topology and how to build a testbed.
+1. Learn how to generate a test topology and how to setup a testbed.
 2. Extract functions with the same function in different files and put them into a common file
    
    The function of sending routes is defined in several BGP test files. We can put this common function into a public file, and then all scripts call this function, which is more convenient for maintenance.
+
+For example:
+- `test_bgp_sentinel.py`
+
+```python
+def announce_route(ptfip, neighbor, route, nexthop, port, community):
+    change_route("announce", ptfip, neighbor, route, nexthop, port, community)
+```
+
+- `test_bgp_bbr.py`
+```python
+def announce_routes(routes):
+    logger.info('Announce routes {} to the first T0'.format(str(routes)))
+    for route in routes:
+        bbr_routes.append(route)
+        if ipaddress.IPNetwork(route.prefix).version == 4:
+            update_routes('announce', ptfhost.mgmt_ip, tor1_exabgp_port, route)
+        else:
+            update_routes('announce', ptfhost.mgmt_ip, tor1_exabgp_port_v6, route)
+    time.sleep(3)
+```
